@@ -2,22 +2,15 @@ package main
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
-
-type Todo struct {
-	Content   string `json:"content"`
-	DueString string `json:"due_string"`
-	DueLang   string `json:"due_lang"`
-	Priority  int    `json:"priority"`
-}
 
 func main() {
 	clearScreen()
@@ -46,25 +39,35 @@ func main() {
 }
 
 func clearScreen() {
-	cmd := exec.Command("clear")
+	switch runtime.GOOS {
+	case "darwin":
+		runCmd("clear")
+	case "linux":
+		runCmd("clear")
+	case "windows":
+		runCmd("cmd", "/c", "cls")
+	default:
+		runCmd("clear")
+	}
+}
+
+func runCmd(name string, arg ...string) {
+	cmd := exec.Command(name, arg...)
 	cmd.Stdout = os.Stdout
 	cmd.Run()
 }
 func createTask(task string) {
-	todo := Todo{
-		Content: task,
-	}
-	payloadBytes, err := json.Marshal(todo)
-	if err != nil {
-		fmt.Println(err)
-	}
-	body := bytes.NewReader(payloadBytes)
+	params := url.Values{}
+	params.Add("text", task)
 
-	req, err := http.NewRequest("POST", "https://api.todoist.com/rest/v2/tasks", body)
+	body := strings.NewReader(params.Encode())
+
+	req, err := http.NewRequest("POST", "https://api.todoist.com/sync/v9/quick/add", body)
 	if err != nil {
 		fmt.Println(err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", os.ExpandEnv("Bearer ${TODOIST_TOKEN}"))
 
 	resp, err := http.DefaultClient.Do(req)
